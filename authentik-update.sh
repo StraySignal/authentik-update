@@ -1,31 +1,70 @@
 #!/usr/bin/env bash
 set -e
+set -o pipefail
 
+### ========== Variables ==========
 APP="Authentik"
 APP_DIR="/opt/authentik"
 VERSION_FILE="/opt/${APP}_version.txt"
-
-echo "[*] Checking for latest release..."
+BACKUP_DIR="/root/authentik-backups"
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 RELEASE_URL=$(curl -fsSL https://api.github.com/repos/goauthentik/authentik/releases/latest | grep "tarball_url" | cut -d '"' -f4)
 RELEASE_TAG=$(basename "$RELEASE_URL")
+DB_NAME="authentik"
+DB_USER="authentik"
 
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+RED="\033[1;31m"
+NC="\033[0m"
+NC="\033[0m"
+
+log()    { echo -e "${YELLOW}[*] $1${NC}"; }
+log_ok() { echo -e "${GREEN}[✓] $1${NC}"; }
+log_err(){ echo -e "${RED}[✗] $1${NC}"; }
+
+### ========== Step 1: Check for Updates ==========
+log "Checking for latest release..."
 if [[ -f "$VERSION_FILE" && "$RELEASE_TAG" == "$(cat "$VERSION_FILE")" ]]; then
-    echo "[✓] Already at latest version: $RELEASE_TAG"
+    log_ok "Already at latest version: $RELEASE_TAG"
     exit 0
 fi
 
-echo "[*] Stopping services..."
-systemctl stop authentik-server authentik-worker || true
+### ========== Step 2: Create Backups ==========
+log "Creating pre-update backup..."
 
-echo "[*] Downloading release: $RELEASE_TAG"
+mkdir -p "$BACKUP_DIR/$TIMESTAMP"
+
+# Backup PostgreSQL DB
+pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_DIR/$TIMESTAMP/db_backup.sql"
+
+# Backup config file
+cp /etc/authentik/config.yml "$BACKUP_DIR/$TIMESTAMP/config.yml"
+
+# Backup blueprints
+cp -r "$APP_DIR/blueprints" "$BACKUP_DIR/$TIMESTAMP/blueprints"
+
+log_ok "Backup saved to $BACKUP_DIR/$TIMESTAMP"
+
+### ========== Step 3: Stop Services ==========
+log "Stopping authentik services..."
+systemctl stop authentik-server || true
+systemctl stop authentik-worker || true
+systemctl stop authentik-celery-beat || true
+log_ok "Services stopped."
+
+### ========== Step 4: Download & Replace ==========
+log "Downloading latest release: $RELEASE_TAG"
 cd /tmp
 curl -fsSL "$RELEASE_URL" -o authentik.tar.gz
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
 tar -xzf authentik.tar.gz -C "$APP_DIR" --strip-components=1
 rm -f authentik.tar.gz
+log_ok "Release extracted."
 
-echo "[*] Building frontend..."
+### ========== Step 5: Build Frontend ==========
+log "Building frontend (website & web)..."
 cd "$APP_DIR/website"
 npm install
 npm run build-bundled
@@ -33,24 +72,36 @@ npm run build-bundled
 cd "$APP_DIR/web"
 npm install
 npm run build
+log_ok "Frontend built."
 
-echo "[*] Building backend..."
+### ========== Step 6: Build Backend ==========
+log "Building backend server..."
 cd "$APP_DIR"
 go mod download
 go build -o /go/authentik ./cmd/server
 go build -o "$APP_DIR/authentik-server" ./cmd/server
+log_ok "Backend built."
 
-echo "[*] Syncing Python deps and running migrations..."
+### ========== Step 7: Sync Python Dependencies & Migrate ==========
+log "Syncing Python deps & running migrations..."
 uv sync --frozen --no-install-project --no-dev
 uv run python -m lifecycle.migrate
+log_ok "Migration complete."
 
+# Ensure gunicorn/celery are in path
 ln -sf "$APP_DIR/.venv/bin/gunicorn" /usr/local/bin/gunicorn
 ln -sf "$APP_DIR/.venv/bin/celery" /usr/local/bin/celery
 
+# Save version
 echo "$RELEASE_TAG" > "$VERSION_FILE"
 
-echo "[*] Starting services..."
+### ========== Step 8: Restart Services ==========
+log "Starting authentik services..."
 systemctl start authentik-server
 systemctl start authentik-worker
+systemctl start authentik-celery-beat
+log_ok "All services started."
 
-echo "[✓] Authentik updated to $RELEASE_TAG"
+### ========== Done ==========
+log_ok "Authentik updated to $RELEASE_TAG"
+log "Backup location: $BACKUP_DIR/$TIMESTAMP"
