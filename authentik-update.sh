@@ -223,9 +223,38 @@ echo "$RELEASE_TAG" > "$VERSION_FILE"
 
 ### ========== Step 8: Restart Services ==========
 log "Starting authentik services..."
+log "Starting authentik services..."
 systemctl start authentik-server
 systemctl start authentik-worker
+if [[ ! -f /etc/systemd/system/authentik-celery-beat.service ]]; then
+    log "authentik-celery-beat.service not found. Creating it..."
+    cat <<EOF >/etc/systemd/system/authentik-celery-beat.service
+[Unit]
+Description=authentik Celery Beat Scheduler
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/authentik
+ExecStart=/opt/authentik/.venv/bin/celery \\
+  -A authentik.root.celery beat \\
+  -s /tmp/celerybeat-schedule
+Restart=always
+RestartSec=5
+Environment=DJANGO_SETTINGS_MODULE=authentik.root.settings
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl enable authentik-celery-beat
+    log_ok "Created and enabled authentik-celery-beat service."
+fi
+
 systemctl start authentik-celery-beat
+log_ok "All services started."
+
 log_ok "All services started."
 
 ### ========== Done ==========
