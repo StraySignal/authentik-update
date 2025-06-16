@@ -17,7 +17,6 @@ GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
 RED="\033[1;31m"
 NC="\033[0m"
-NC="\033[0m"
 
 log()    { echo -e "${YELLOW}[*] $1${NC}"; }
 log_ok() { echo -e "${GREEN}[✓] $1${NC}"; }
@@ -35,8 +34,21 @@ log "Creating pre-update backup..."
 
 mkdir -p "$BACKUP_DIR/$TIMESTAMP"
 
+# Extract DB password from config.yml
+if command -v yq >/dev/null 2>&1; then
+    DB_PASS=$(yq '.postgresql.password' /etc/authentik/config.yml)
+elif grep -q 'postgresql.password' /etc/authentik/config.yml; then
+    DB_PASS=$(grep 'postgresql.password' /etc/authentik/config.yml | cut -d '"' -f2)
+else
+    log_err "Unable to extract PostgreSQL password from config.yml"
+    exit 1
+fi
+
 # Backup PostgreSQL DB
-pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_DIR/$TIMESTAMP/db_backup.sql"
+PGPASSWORD="$DB_PASS" pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_DIR/$TIMESTAMP/db_backup.sql" || {
+    log_err "Database backup failed"
+    exit 1
+}
 
 # Backup config file
 cp /etc/authentik/config.yml "$BACKUP_DIR/$TIMESTAMP/config.yml"
