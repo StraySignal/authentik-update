@@ -34,17 +34,19 @@ log "Creating pre-update backup..."
 
 mkdir -p "$BACKUP_DIR/$TIMESTAMP"
 
-# Delete backups older than 6 months
+# Delete backups older than 6 months only if at least one newer backup exists
 log "Checking for backups older than 6 months to delete..."
-OLD_BACKUPS=$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180)
-if [[ -n "$OLD_BACKUPS" ]]; then
-    while IFS= read -r backup; do
+ALL_BACKUPS=($(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort))
+OLD_BACKUPS=($(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 | sort))
+
+if [[ ${#ALL_BACKUPS[@]} -gt 1 && ${#OLD_BACKUPS[@]} -gt 0 ]]; then
+    for backup in "${OLD_BACKUPS[@]}"; do
         log "Deleting old backup: $backup"
         rm -rf "$backup"
-    done <<< "$OLD_BACKUPS"
+    done
     log_ok "Old backups deleted."
 else
-    log_ok "No old backups found."
+    log_ok "No old backups found or not enough backups to delete."
 fi
 
 # Extract DB password from config.yml
