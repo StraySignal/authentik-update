@@ -56,14 +56,19 @@ if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
                     ;;
             esac
         done
-        log_ok "Attempted to install missing packages. Please re-run the script if any installation failed."
         # Re-check after install
+        STILL_MISSING=()
         for cmd in "${MISSING_CMDS[@]}"; do
             if ! command -v "$cmd" >/dev/null 2>&1; then
-                log_err "'$cmd' is still not installed. Please install it manually and re-run the script."
-                exit 1
+                STILL_MISSING+=("$cmd")
             fi
         done
+        if [[ ${#STILL_MISSING[@]} -gt 0 ]]; then
+            log_err "The following commands are still missing: ${STILL_MISSING[*]}"
+            log_err "Please install them manually and re-run the script."
+            exit 1
+        fi
+        log_ok "All required commands are now installed."
     else
         log_err "Cannot continue without required packages. Exiting."
         exit 1
@@ -180,10 +185,6 @@ log_ok "Backend built."
 
 ### ========== Step 7: Sync Python Dependencies & Migrate ==========
 log "Syncing Python deps & running migrations..."
-if ! command -v uv >/dev/null 2>&1; then
-    log_err "'uv' is not installed. Please install it with 'pip install uv' or 'pipx install uv'."
-    exit 1
-fi
 
 uv sync --frozen --no-install-project --no-dev
 uv run python -m lifecycle.migrate
