@@ -154,13 +154,53 @@ log_ok "All services started."
 log_ok "Authentik updated to $RELEASE_TAG"
 log "Backup location: $BACKUP_DIR/$TIMESTAMP"
 
+### ========== Check & Prompt for Required Commands ==========
 REQUIRED_CMDS=(go node npm uv pg_dump)
+MISSING_CMDS=()
+
 for cmd in "${REQUIRED_CMDS[@]}"; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
-        log_err "'$cmd' is not installed or not in PATH. Please install it before running this script."
-        exit 1
+        MISSING_CMDS+=("$cmd")
     fi
 done
+
+if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
+    log_err "Missing required commands: ${MISSING_CMDS[*]}"
+    read -p "Attempt to install missing packages? [Y/n]: " INSTALL_CONFIRM
+    if [[ ! "$INSTALL_CONFIRM" =~ ^([nN][oO]?|[nN])$ ]]; then
+        for cmd in "${MISSING_CMDS[@]}"; do
+            case "$cmd" in
+                go)
+                    log "Installing Go..."
+                    apt-get update && apt-get install -y golang
+                    ;;
+                node|npm)
+                    log "Installing Node.js and npm..."
+                    apt-get update && apt-get install -y nodejs npm
+                    ;;
+                uv)
+                    log "Installing uv (via pip)..."
+                    pip install uv || pipx install uv
+                    ;;
+                pg_dump)
+                    log "Installing PostgreSQL client..."
+                    apt-get update && apt-get install -y postgresql-client
+                    ;;
+            esac
+        done
+        log_ok "Attempted to install missing packages. Please re-run the script if any installation failed."
+        # Re-check after install
+        for cmd in "${MISSING_CMDS[@]}"; do
+            if ! command -v "$cmd" >/dev/null 2>&1; then
+                log_err "'$cmd' is still not installed. Please install it manually and re-run the script."
+                exit 1
+            fi
+        done
+    else
+        log_err "Cannot continue without required packages. Exiting."
+        exit 1
+    fi
+fi
 
 # Optional: Warn if yq is missing (for better config parsing)
 if ! command -v yq >/dev/null 2>&1; then

@@ -43,12 +43,23 @@ Includes:
 
 ## ✅ Requirements
 
-Make sure these tools are installed in your container:
+The script **automatically checks for required tools** and will prompt you to install any that are missing:
 
 - `go`
 - `node` + `npm`
 - [`uv`](https://github.com/astral-sh/uv)
 - `pg_dump` (from `postgresql-client`)
+
+If a tool is missing, the script will ask:
+
+```
+Missing required commands: go uv
+Attempt to install missing packages? [Y/n]:
+```
+
+If you confirm, it will attempt to install the missing packages using `apt-get` or `pip`.  
+**You may need to run the script as root for installations to succeed.**
+
 - Minimum **8–10 GB RAM** (or skip doc builds)
 
 ---
