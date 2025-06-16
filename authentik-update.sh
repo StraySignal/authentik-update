@@ -45,7 +45,7 @@ else
 fi
 
 # Backup PostgreSQL DB
-PGPASSWORD="$DB_PASS" pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_DIR/$TIMESTAMP/db_backup.sql" || {
+PGPASSWORD="$DB_PASS" pg_dump -h 127.0.0.1 -U "$DB_USER" "$DB_NAME" > "$BACKUP_DIR/$TIMESTAMP/db_backup.sql" || {
     log_err "Database backup failed"
     exit 1
 }
