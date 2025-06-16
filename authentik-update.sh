@@ -94,7 +94,8 @@ log_ok "Release extracted."
 log "Building frontend (website & web)..."
 cd "$APP_DIR/website"
 npm install
-npm run build-bundled
+NODE_OPTIONS="--max_old_space_size=2048" npm run build-bundled
+log_ok "Website built."
 
 cd "$APP_DIR/web"
 npm install
