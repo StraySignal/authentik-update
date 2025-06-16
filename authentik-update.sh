@@ -90,12 +90,27 @@ tar -xzf authentik.tar.gz -C "$APP_DIR" --strip-components=1
 rm -f authentik.tar.gz
 log_ok "Release extracted."
 
+### ========== Prompt for Website Build ==========
+read -p "Build website (documentation)? [Y/n]: " BUILD_WEBSITE_INPUT
+if [[ "$BUILD_WEBSITE_INPUT" =~ ^([nN][oO]?|[nN])$ ]]; then
+    SKIP_WEBSITE=1
+    log "User chose to skip website build."
+else
+    SKIP_WEBSITE=0
+    log "User chose to build website."
+fi
+
 ### ========== Step 5: Build Frontend ==========
-log "Building frontend (website & web)..."
-cd "$APP_DIR/website"
-npm install
-NODE_OPTIONS="--max_old_space_size=2048" npm run build-bundled
-log_ok "Website built."
+
+if [[ $SKIP_WEBSITE -eq 1 ]]; then
+    log "Skipping website build (user choice)..."
+else
+    log "Building frontend (website & web)..."
+    cd "$APP_DIR/website"
+    npm install
+    NODE_OPTIONS="--max_old_space_size=2048" npm run build-bundled
+    log_ok "Website built."
+fi
 
 cd "$APP_DIR/web"
 npm install
