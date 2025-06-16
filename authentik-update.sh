@@ -1,6 +1,30 @@
 #!/usr/bin/env bash
 set -e
+set -u
 set -o pipefail
+
+LOG_FILE="/var/log/authentik-update.log"
+: > "$LOG_FILE"  # Truncate log file at start
+
+log()    { echo -e "${YELLOW}[*] $1${NC}"; echo "[*] $1"    >> "$LOG_FILE"; }
+log_ok() { echo -e "${GREEN}[✓] $1${NC}"; echo "[✓] $1"    >> "$LOG_FILE"; }
+log_err(){ echo -e "${RED}[✗] $1${NC}"; echo "[✗] $1"      >> "$LOG_FILE"; }
+
+prompt_log_and_exit() {
+    log_err "An unexpected error occurred. Exiting."
+    read -p "Would you like to view the log file ($LOG_FILE)? [Y/n]: " VIEW_LOG
+    if [[ ! "$VIEW_LOG" =~ ^([nN][oO]?|[nN])$ ]]; then
+        cat "$LOG_FILE"
+    fi
+    exit 1
+}
+
+trap 'prompt_log_and_exit' ERR
+
+if [[ $EUID -ne 0 ]]; then
+    log_err "This script must be run as root."
+    exit 1
+fi
 
 ### ========== Variables ==========
 APP="Authentik"
@@ -17,10 +41,6 @@ GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
 RED="\033[1;31m"
 NC="\033[0m"
-
-log()    { echo -e "${YELLOW}[*] $1${NC}"; }
-log_ok() { echo -e "${GREEN}[✓] $1${NC}"; }
-log_err(){ echo -e "${RED}[✗] $1${NC}"; }
 
 ### ========== Check & Prompt for Required Commands ==========
 REQUIRED_CMDS=(go node npm uv pg_dump)
@@ -127,7 +147,11 @@ PGPASSWORD="$DB_PASS" pg_dump -h 127.0.0.1 -U "$DB_USER" "$DB_NAME" > "$BACKUP_D
 cp /etc/authentik/config.yml "$BACKUP_DIR/$TIMESTAMP/config.yml"
 
 # Backup blueprints
-cp -r "$APP_DIR/blueprints" "$BACKUP_DIR/$TIMESTAMP/blueprints"
+if [[ ! -d "$APP_DIR/blueprints" ]]; then
+    log "Warning: $APP_DIR/blueprints directory not found. Skipping blueprint backup."
+else
+    cp -r "$APP_DIR/blueprints" "$BACKUP_DIR/$TIMESTAMP/blueprints"
+fi
 
 log_ok "Backup saved to $BACKUP_DIR/$TIMESTAMP"
 
