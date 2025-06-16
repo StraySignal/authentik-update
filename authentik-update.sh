@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+set -o pipefail
 
 ### ========== Variables ==========
 APP="Authentik"
@@ -12,9 +13,10 @@ RELEASE_TAG=$(basename "$RELEASE_URL")
 DB_NAME="authentik"
 DB_USER="authentik"
 
-### ========== Logging Helpers ==========
 GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
+RED="\033[1;31m"
+NC="\033[0m"
 NC="\033[0m"
 
 log()    { echo -e "${YELLOW}[*] $1${NC}"; }
