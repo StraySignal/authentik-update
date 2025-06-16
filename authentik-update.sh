@@ -107,14 +107,14 @@ if [[ $SKIP_WEBSITE -eq 1 ]]; then
 else
     log "Building frontend (website & web)..."
     cd "$APP_DIR/website"
-    npm install
-    NODE_OPTIONS="--max_old_space_size=2048" npm run build-bundled
+    npm install --loglevel=error
+    NODE_OPTIONS="--max_old_space_size=2048" npm run build-bundled --loglevel=error
     log_ok "Website built."
 fi
 
 cd "$APP_DIR/web"
-npm install
-npm run build
+npm install --loglevel=error
+npm run build --loglevel=error
 log_ok "Frontend built."
 
 ### ========== Step 6: Build Backend ==========
@@ -127,6 +127,11 @@ log_ok "Backend built."
 
 ### ========== Step 7: Sync Python Dependencies & Migrate ==========
 log "Syncing Python deps & running migrations..."
+if ! command -v uv >/dev/null 2>&1; then
+    log_err "'uv' is not installed. Please install it with 'pip install uv' or 'pipx install uv'."
+    exit 1
+fi
+
 uv sync --frozen --no-install-project --no-dev
 uv run python -m lifecycle.migrate
 log_ok "Migration complete."
@@ -148,3 +153,16 @@ log_ok "All services started."
 ### ========== Done ==========
 log_ok "Authentik updated to $RELEASE_TAG"
 log "Backup location: $BACKUP_DIR/$TIMESTAMP"
+
+REQUIRED_CMDS=(go node npm uv pg_dump)
+for cmd in "${REQUIRED_CMDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        log_err "'$cmd' is not installed or not in PATH. Please install it before running this script."
+        exit 1
+    fi
+done
+
+# Optional: Warn if yq is missing (for better config parsing)
+if ! command -v yq >/dev/null 2>&1; then
+    log "Warning: 'yq' not found. Falling back to basic config parsing."
+fi

@@ -49,7 +49,7 @@ Make sure these tools are installed in your container:
 - `node` + `npm`
 - [`uv`](https://github.com/astral-sh/uv)
 - `pg_dump` (from `postgresql-client`)
-- Minimum **8–10 GB RAM** (or comment out doc builds)
+- Minimum **8–10 GB RAM** (or skip doc builds)
 
 ---
 
@@ -62,11 +62,20 @@ pct stop <vmid>
 pct start <vmid>
 ```
 
-If you don’t need the docs site (website), you can speed up the process by commenting out:
+---
 
-```bash
-npm run build-bundled
+## 🆕 Website Build Prompt
+
+During the update, the script will **prompt you**:
+
 ```
+Build website (documentation)? [Y/n]:
+```
+
+- Enter `n` or `N` to **skip building the website** (documentation).  
+- Press `Enter` or type `y` to build it as usual.
+
+> Skipping the website build can save time and memory, especially if you don't need the documentation site.
 
 ---
 
