@@ -34,6 +34,19 @@ log "Creating pre-update backup..."
 
 mkdir -p "$BACKUP_DIR/$TIMESTAMP"
 
+# Delete backups older than 6 months
+log "Checking for backups older than 6 months to delete..."
+OLD_BACKUPS=$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180)
+if [[ -n "$OLD_BACKUPS" ]]; then
+    while IFS= read -r backup; do
+        log "Deleting old backup: $backup"
+        rm -rf "$backup"
+    done <<< "$OLD_BACKUPS"
+    log_ok "Old backups deleted."
+else
+    log_ok "No old backups found."
+fi
+
 # Extract DB password from config.yml
 if command -v yq >/dev/null 2>&1; then
     DB_PASS=$(yq '.postgresql.password' /etc/authentik/config.yml)
