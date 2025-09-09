@@ -1,3 +1,9 @@
+# NO LONGER MAINTAINED
+
+I'm not maintaining this anymore, I ended up ditching Authentik because it was just constant updating and breaking. Feel free to fork and use this at your own discretion!
+
+---
+
 # Authentik Manual Update Script
 
 This script updates an **LXC-installed, source-built** instance of [Authentik](https://goauthentik.io) (originally set up using the now-deprecated Proxmox Helper Script).
